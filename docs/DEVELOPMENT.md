@@ -7,7 +7,8 @@ Welcome to the arXiv Insight developer guide. This document outlines the project
 The system consists of three primary components:
 1. **Data Ingestion (`agy-ingest`)**: A CLI tool that fetches papers from the arXiv API, parses the XML, generates 384-dimensional dense vectors locally using `fastembed` (`BAAI/bge-small-en-v1.5`), and inserts them into the database.
 2. **PostgreSQL Database (`pgvector`)**: Stores relational metadata (authors, categories) and dense vector embeddings. Uses Reciprocal Rank Fusion (RRF) to combine traditional Full-Text Search (BM25) with Cosine Similarity vector search.
-3. **FastAPI Backend (`app.main`)**: Serves the REST API, the RAG endpoints, and the static HTML/CSS/JS frontend.
+3. **Redis**: Powers our `SlowAPI` tiered rate limiter to prevent abuse and aggressively caches heavy statistical dashboard queries for instant load times.
+4. **FastAPI Backend (`app.main`)**: Serves the REST API, the Advanced RAG endpoints (powered exclusively by Groq via the `llama3-70b-8192` model), and the static HTML/CSS/JS frontend.
 
 ## 📁 Project Structure
 
