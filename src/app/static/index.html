@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>arXiv Insight - RAG</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: rgba(30, 41, 59, 0.7);
+            --border: rgba(255, 255, 255, 0.1);
+            --primary: #3b82f6;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Glassmorphism Sidebar */
+        .sidebar {
+            width: 350px;
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .charts-scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding-right: 5px;
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        h1,
+        h2 {
+            margin: 0;
+            font-weight: 600;
+        }
+
+        /* Chat interface */
+        .chat-container {
+            flex: 1;
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .chat-history {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 15px;
+            border-radius: 12px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .msg-user {
+            background: var(--primary);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg-bot {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .sources-box {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border);
+            font-size: 0.85em;
+            color: var(--text-muted);
+        }
+
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0 25px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        .chart-container {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px;
+            margin-top: auto;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .loading {
+            align-self: center;
+            color: var(--text-muted);
+            font-style: italic;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="sidebar">
+        <h2>arXiv Insight</h2>
+        <!-- <p style="color: var(--text-muted); font-size: 0.9em;">Ask questions against thousands of AI papers instantly.</p> -->
+
+        <div class="charts-scroll-area">
+            <div class="chart-container">
+                <h3 style="font-size: 14px; margin-top:0;">Ingestion Timeline</h3>
+                <canvas id="timelineChart" height="200"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <h3 style="font-size: 14px; margin-top:0;">Top Categories</h3>
+                <canvas id="categoriesChart" height="200"></canvas>
+            </div>
+
+            <div class="chart-container">
+                <h3 style="font-size: 14px; margin-top:0;">Top Authors</h3>
+                <canvas id="authorsChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="chat-container">
+            <div class="chat-history" id="chatHistory">
+                <div class="message msg-bot">
+                    Hello! I am connected to the arXiv Insight RAG database. What would you like to know about the
+                    ingested papers?
+                </div>
+            </div>
+            <div class="loading" id="loadingIndicator">Searching vector database & synthesizing response...</div>
+            <div class="input-area">
+                <input type="text" id="questionInput"
+                    placeholder="Ask a question (e.g., 'What are the latest advancements in Transformers?')"
+                    onkeypress="if(event.key === 'Enter') askQuestion()">
+                <button onclick="askQuestion()">Ask RAG</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set default Chart.js styles
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        async function loadCharts() {
+            try {
+                // 1. Timeline Chart
+                const resTimeline = await fetch(`/api/v1/stats/papers-over-time?granularity=month&_=${Date.now()}`);
+                if (resTimeline.ok) {
+                    const data = await resTimeline.json();
+                    const labels = data.map(d => new Date(d.period).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }));
+                    const counts = data.map(d => d.count);
+                    new Chart(document.getElementById('timelineChart').getContext('2d'), {
+                        type: 'line',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Papers',
+                                data: counts,
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: { plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.1)' } }, x: { grid: { display: false } } } }
+                    });
+                }
+
+                // 2. Categories Chart (Bar)
+                const resCats = await fetch(`/api/v1/stats/top-categories?limit=5&_=${Date.now()}`);
+                if (resCats.ok) {
+                    const data = await resCats.json();
+                    new Chart(document.getElementById('categoriesChart').getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: data.map(d => d.code),
+                            datasets: [{
+                                label: 'Papers',
+                                data: data.map(d => d.count),
+                                backgroundColor: '#10b981',
+                                borderRadius: 4
+                            }]
+                        },
+                        options: { plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.1)' } }, x: { grid: { display: false } } } }
+                    });
+                }
+
+                // 3. Authors Chart (Horizontal Bar)
+                const resAuthors = await fetch(`/api/v1/stats/top-authors?limit=5&_=${Date.now()}`);
+                if (resAuthors.ok) {
+                    const data = await resAuthors.json();
+                    new Chart(document.getElementById('authorsChart').getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: data.map(d => d.display_name.split(' ').pop()), // Just last name to save space
+                            datasets: [{
+                                label: 'Papers',
+                                data: data.map(d => d.count),
+                                backgroundColor: '#f59e0b',
+                                borderRadius: 4
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y', // horizontal bar
+                            plugins: { legend: { display: false } },
+                            scales: { x: { grid: { color: 'rgba(255,255,255,0.1)' } }, y: { grid: { display: false } } }
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to load charts", e);
+            }
+        }
+
+        loadCharts();
+
+        // RAG Chat Logic
+        async function askQuestion() {
+            const input = document.getElementById('questionInput');
+            const question = input.value.trim();
+            if (!question) return;
+
+            // Add user message
+            addMessage(question, 'user');
+            input.value = '';
+
+            // Show loading
+            document.getElementById('loadingIndicator').style.display = 'block';
+
+            try {
+                const res = await fetch('/api/v1/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: question, top_k: 5 })
+                });
+
+                const data = await res.json();
+                document.getElementById('loadingIndicator').style.display = 'none';
+
+                if (!res.ok) {
+                    addMessage("Error: " + (data.error?.message || "Something went wrong."), 'bot');
+                    return;
+                }
+
+                let answerHtml = data.answer.replace(/\n/g, '<br>');
+
+                // Add sources if available
+                if (data.sources && data.sources.length > 0) {
+                    answerHtml += `<div class="sources-box"><strong>Sources:</strong><ul>`;
+                    data.sources.forEach(s => {
+                        answerHtml += `<li><a href="${s.url}" target="_blank" style="color: #3b82f6">${s.title}</a> (${s.authors.slice(0, 2).join(', ')}${s.authors.length > 2 ? ' et al.' : ''})</li>`;
+                    });
+                    answerHtml += `</ul></div>`;
+                }
+
+                addMessage(answerHtml, 'bot', true);
+            } catch (e) {
+                document.getElementById('loadingIndicator').style.display = 'none';
+                addMessage("Connection error.", 'bot');
+            }
+        }
+
+        function addMessage(text, sender, isHtml = false) {
+            const history = document.getElementById('chatHistory');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message msg-${sender}`;
+            if (isHtml) {
+                msgDiv.innerHTML = text;
+            } else {
+                msgDiv.textContent = text;
+            }
+            history.appendChild(msgDiv);
+            history.scrollTop = history.scrollHeight;
+        }
+    </script>
+</body>
+
+</html>
