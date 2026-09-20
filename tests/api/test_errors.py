@@ -6,8 +6,8 @@ client = TestClient(app)
 
 
 def test_validation_error_envelope() -> None:
-    # Sending a string to 'limit' which expects an integer should trigger a 422
-    response = client.get("/api/v1/stats/top-authors?limit=not_an_int")
+    # Sending a missing field to a POST endpoint should trigger a 422
+    response = client.post("/api/v1/ask", json={})
     assert response.status_code == 422
 
     data = response.json()

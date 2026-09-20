@@ -1,4 +1,5 @@
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -9,7 +10,7 @@ from app.db.session import get_db_session
 from app.main import app
 
 
-async def mock_db_session() -> AsyncGenerator[AsyncMock, None]:
+async def mock_db_session() -> AsyncGenerator[AsyncMock]:
     # Return a dummy mock that doesn't actually hit postgres
     mock_session = AsyncMock()
     # Mock the return values for the stats endpoint

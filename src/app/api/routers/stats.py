@@ -1,4 +1,3 @@
-import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -10,9 +9,6 @@ from app.api.schemas.stats import (
     CorpusSummary,
     StatsEnvelope,
     StatsMeta,
-    TimeSeriesPoint,
-    TopAuthor,
-    TopCategory,
     VisualizationResponse,
 )
 from app.db.repositories.stats import StatsRepository
@@ -22,8 +18,10 @@ from app.services.stats import StatsService
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
-from app.core.redis import get_redis_client
 from redis.asyncio import Redis
+
+from app.core.redis import get_redis_client
+
 
 def get_stats_service(
     session: AsyncSession = Depends(get_db_session),

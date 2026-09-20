@@ -62,14 +62,14 @@ class EvaluationService:
             "What are the rules of competitive underwater basket weaving?",
             "What is the weather like in Tokyo today?",
             "How do I change the oil in a 2012 Honda Civic?",
-            
+
             # Domain-adjacent but out-of-corpus (assuming cs.*)
             "What is the mechanism of action of penicillin in treating bacterial infections?",
             "How did the fall of the Roman Empire affect medieval trade routes?",
             "Explain the process of photosynthesis in C4 plants.",
             "What are the key differences between Keynesian and Austrian economics?",
             "How does quantum tunneling affect the half-life of radioactive isotopes?",
-            
+
             # Tricky/Adversarial (sounds like CS/ML but is nonsense or explicitly unsupported)
             "What is the optimal hyperparameter setting for baking a cake using neural networks?",
             "Who won the Super Bowl in the year 2045?",

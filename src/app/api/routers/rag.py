@@ -36,7 +36,7 @@ async def ask_question(
     # 1. Sanitize Input
     # Strip leading/trailing whitespace and collapse multiple spaces/newlines into a single space
     sanitized_question = " ".join(ask_req.question.split())
-    
+
     if len(sanitized_question) < 5:
         raise HTTPException(status_code=422, detail="Question too short")
     if len(sanitized_question) > 500:
@@ -44,5 +44,5 @@ async def ask_question(
 
     # Update the request with the sanitized string before passing to service
     ask_req.question = sanitized_question
-    
+
     return await rag_svc.ask(ask_req)

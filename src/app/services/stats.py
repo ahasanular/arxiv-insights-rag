@@ -1,7 +1,4 @@
-import asyncio
-import datetime
 import json
-from typing import Any
 
 import structlog
 from redis.asyncio import Redis
@@ -45,7 +42,7 @@ class StatsService:
                 dumped = json.dumps([item.model_dump() for item in result])
             else:
                 dumped = json.dumps(result.model_dump())
-            await self.redis_client.setex(cache_key, self.cache_ttl, dumped)
+            await self.redis_client.set(cache_key, dumped, ex=self.cache_ttl)
         except Exception as e:
             logger.warning("Redis cache write failed", cache_key=cache_key, error=str(e))
 

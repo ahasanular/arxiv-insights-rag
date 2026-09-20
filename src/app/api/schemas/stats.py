@@ -58,7 +58,7 @@ class StatsEnvelope(BaseModel, Generic[T]):
 
 class VisualizationResponse(BaseModel):
     """Aggregate response containing data for all dashboard charts."""
-    
+
     summary: CorpusSummary
     papers_over_time: list[TimeSeriesPoint]
     top_categories: list[TopCategory]

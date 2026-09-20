@@ -150,9 +150,9 @@ class LlmService:
 
             return RagResponseSchema(
                 reasoning="Generated using extractive fallback method.",
-                answer=answer, 
-                used_source_ids=used_ids, 
-                confidence=1.0, 
+                answer=answer,
+                used_source_ids=used_ids,
+                confidence=1.0,
                 insufficient_context=False
             ), False
 

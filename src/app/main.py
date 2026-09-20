@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     yield
 
     logger.info("Application shutting down")
-    
+
     # Gracefully close global Redis connection pool
     try:
         from app.core.redis import redis_client

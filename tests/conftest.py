@@ -40,6 +40,7 @@ def engine(db_url):
 
 from sqlalchemy import text
 
+
 @pytest_asyncio.fixture()
 async def db_session(engine):
     """

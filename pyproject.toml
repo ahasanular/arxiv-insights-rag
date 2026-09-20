@@ -75,6 +75,9 @@ testpaths = [
 pythonpath = [
     "src"
 ]
+filterwarnings = [
+    "ignore:The anyio.abc.BlockingPortal alias is deprecated:DeprecationWarning"
+]
 
 [dependency-groups]
 dev = [
