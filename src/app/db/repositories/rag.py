@@ -35,8 +35,9 @@ class RagRepository:
         self, query_text: str, query_vector: list[float], limit: int = 50, tau: float = 0.75
     ) -> tuple[list[dict[str, Any]], bool]:
         """
-        Executes a hybrid search using pgvector (cosine similarity) and ts_rank_cd.
-        Combines results using Reciprocal Rank Fusion (RRF).
+        Executes a hybrid search using pgvector (cosine similarity) and the GIN-indexed
+        search_vector column (ts_rank_cd). Combines results using Reciprocal Rank Fusion (RRF).
+
         Returns:
             - list of documents (dicts)
             - should_abstain (boolean) indicating if the results fell below the relevance gate.
@@ -75,17 +76,17 @@ class RagRepository:
             SELECT 
                 p.id,
                 ts_rank_cd(
-                    to_tsvector('english', p.title || ' ' || p.abstract), 
+                    p.search_vector, 
                     plainto_tsquery('english', :query_text)
                 ) AS fts_score,
                 ROW_NUMBER() OVER(
                     ORDER BY ts_rank_cd(
-                        to_tsvector('english', p.title || ' ' || p.abstract), 
+                        p.search_vector, 
                         plainto_tsquery('english', :query_text)
                     ) DESC
                 ) as fts_rank
             FROM papers p
-            WHERE 1=1
+            WHERE p.search_vector @@ plainto_tsquery('english', :query_text)
         """
 
         if years:

@@ -1,4 +1,5 @@
 import structlog
+from asgi_correlation_id import correlation_id
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -6,6 +7,14 @@ from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = structlog.get_logger(__name__)
+
+
+def _get_request_id() -> str | None:
+    """Retrieve the current correlation/request ID, if available."""
+    try:
+        return correlation_id.get()
+    except Exception:
+        return None
 
 
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
@@ -23,6 +32,7 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRe
             "error": {
                 "code": "TOO_MANY_REQUESTS",
                 "message": "Rate limit exceeded. Please try again later.",
+                "request_id": _get_request_id(),
                 "details": str(exc.detail),
             }
         },
@@ -41,6 +51,7 @@ async def validation_exception_handler(
             "error": {
                 "code": "VALIDATION_ERROR",
                 "message": "The request data was invalid.",
+                "request_id": _get_request_id(),
                 "details": exc.errors(),
             }
         },
@@ -53,7 +64,14 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     """
     return JSONResponse(
         status_code=exc.status_code,
-        content={"error": {"code": "HTTP_ERROR", "message": str(exc.detail), "details": None}},
+        content={
+            "error": {
+                "code": "HTTP_ERROR",
+                "message": str(exc.detail),
+                "request_id": _get_request_id(),
+                "details": None,
+            }
+        },
     )
 
 
@@ -68,6 +86,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
             "error": {
                 "code": "INTERNAL_SERVER_ERROR",
                 "message": "An unexpected error occurred.",
+                "request_id": _get_request_id(),
                 "details": None,
             }
         },

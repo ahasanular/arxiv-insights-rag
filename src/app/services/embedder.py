@@ -1,13 +1,28 @@
+from typing import Protocol, runtime_checkable
+
 import structlog
 from fastembed import TextEmbedding
 
 logger = structlog.get_logger()
 
 
+@runtime_checkable
+class EmbedderProtocol(Protocol):
+    """
+    Protocol for embedding services. Any class implementing embed_texts()
+    and exposing model_name can be used interchangeably — production fastembed,
+    mock for tests, or a future OpenAI embedder.
+    """
+
+    model_name: str
+
+    def embed_texts(self, texts: list[str]) -> list[list[float]]: ...
+
+
 class EmbedderService:
     """
-    Singleton-like wrapper for FastEmbed to ensure the model is loaded
-    lazily and only once in the process.
+    Production embedder using FastEmbed. Model is loaded lazily on first
+    call to avoid blocking import time.
     """
 
     def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5") -> None:

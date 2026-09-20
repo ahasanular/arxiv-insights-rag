@@ -8,9 +8,12 @@ from app.api.limiter import limiter
 from app.api.schemas.stats import (
     AuthorsPerPaperStats,
     CorpusSummary,
+    StatsEnvelope,
+    StatsMeta,
     TimeSeriesPoint,
     TopAuthor,
     TopCategory,
+    VisualizationResponse,
 )
 from app.db.repositories.stats import StatsRepository
 from app.db.session import get_db_session
@@ -19,77 +22,52 @@ from app.services.stats import StatsService
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
-def get_stats_service(session: AsyncSession = Depends(get_db_session)) -> StatsService:
+from app.core.redis import get_redis_client
+from redis.asyncio import Redis
+
+def get_stats_service(
+    session: AsyncSession = Depends(get_db_session),
+    redis_client: Redis = Depends(get_redis_client),
+) -> StatsService:
     repo = StatsRepository(session)
-    return StatsService(repo)
+    return StatsService(repo, redis_client)
 
 
-@router.get("/papers-over-time", response_model=list[TimeSeriesPoint])
+@router.get("/visualization", response_model=StatsEnvelope[VisualizationResponse])
 @limiter.limit("60/minute")
-async def papers_over_time(
+async def visualization(
     request: Request,
-    granularity: Annotated[str, Query(pattern="^(month|year)$")] = "month",
-    category: Annotated[str | None, Query()] = None,
-    start_date: Annotated[datetime.datetime | None, Query(alias="from")] = None,
-    end_date: Annotated[datetime.datetime | None, Query(alias="to")] = None,
     service: StatsService = Depends(get_stats_service),
 ):
-    return await service.get_papers_over_time(
-        granularity=granularity,
-        category=category,
-        start_date=start_date,
-        end_date=end_date,
+    data = await service.get_visualization()
+    return StatsEnvelope(
+        data=data,
+        meta=StatsMeta(),
     )
 
 
-@router.get("/top-categories", response_model=list[TopCategory])
-@limiter.limit("60/minute")
-async def top_categories(
-    request: Request,
-    limit: Annotated[int, Query(ge=1, le=50)] = 10,
-    start_date: Annotated[datetime.datetime | None, Query(alias="from")] = None,
-    end_date: Annotated[datetime.datetime | None, Query(alias="to")] = None,
-    service: StatsService = Depends(get_stats_service),
-):
-    return await service.get_top_categories(
-        limit=limit,
-        start_date=start_date,
-        end_date=end_date,
-    )
-
-
-@router.get("/top-authors", response_model=list[TopAuthor])
-@limiter.limit("60/minute")
-async def top_authors(
-    request: Request,
-    limit: Annotated[int, Query(ge=1, le=50)] = 10,
-    category: Annotated[str | None, Query()] = None,
-    start_date: Annotated[datetime.datetime | None, Query(alias="from")] = None,
-    end_date: Annotated[datetime.datetime | None, Query(alias="to")] = None,
-    service: StatsService = Depends(get_stats_service),
-):
-    return await service.get_top_authors(
-        limit=limit,
-        category=category,
-        start_date=start_date,
-        end_date=end_date,
-    )
-
-
-@router.get("/authors-per-paper", response_model=AuthorsPerPaperStats)
+@router.get("/authors-per-paper", response_model=StatsEnvelope[AuthorsPerPaperStats])
 @limiter.limit("60/minute")
 async def authors_per_paper(
     request: Request,
     category: Annotated[str | None, Query()] = None,
     service: StatsService = Depends(get_stats_service),
 ):
-    return await service.get_authors_per_paper(category=category)
+    data = await service.get_authors_per_paper(category=category)
+    return StatsEnvelope(
+        data=data,
+        meta=StatsMeta(filters={"category": category}),
+    )
 
 
-@router.get("/summary", response_model=CorpusSummary)
+@router.get("/summary", response_model=StatsEnvelope[CorpusSummary])
 @limiter.limit("60/minute")
 async def summary(
     request: Request,
     service: StatsService = Depends(get_stats_service),
 ):
-    return await service.get_summary()
+    data = await service.get_summary()
+    return StatsEnvelope(
+        data=data,
+        meta=StatsMeta(),
+    )

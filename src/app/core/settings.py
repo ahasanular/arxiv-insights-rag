@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     PROJECT_NAME: str = "arXiv Insight API"
     REDIS_URL: str = "redis://localhost:6379/0"
+    CORS_ORIGINS: list[str] = ["*"]
 
     # Ingestion
     ARXIV_API_URL: str = "https://export.arxiv.org/api/query"

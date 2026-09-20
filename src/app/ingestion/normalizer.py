@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import re
 import unicodedata
+from typing import Any
 
 from app.ingestion.schemas import PaperDTO
 
@@ -67,7 +68,7 @@ def generate_content_hash(title: str, abstract: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
-def normalize_paper(dto: PaperDTO) -> dict[str, any]:
+def normalize_paper(dto: PaperDTO) -> dict[str, Any]:
     """
     Takes a parsed DTO and normalizes it to dict payload suitable for upsert.
     """

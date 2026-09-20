@@ -24,7 +24,7 @@ from app.core.settings import settings
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # Setup logging on startup
     setup_logging()
     logger = structlog.get_logger()
@@ -33,6 +33,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     yield
 
     logger.info("Application shutting down")
+    
+    # Gracefully close global Redis connection pool
+    try:
+        from app.core.redis import redis_client
+        await redis_client.aclose()
+        logger.info("Redis connection pool closed")
+    except Exception as e:
+        logger.warning("Error closing Redis connection pool", error=str(e))
 
 
 def create_app() -> FastAPI:
@@ -53,10 +61,10 @@ def create_app() -> FastAPI:
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(Exception, generic_exception_handler)
 
-    # CORS
+    # CORS — controlled via CORS_ORIGINS env var (comma-separated or list)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Restrict in production
+        allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

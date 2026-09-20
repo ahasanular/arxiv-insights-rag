@@ -1,14 +1,13 @@
 import time
-
-import structlog
-from fastapi import Request
-from starlette.middleware.base import BaseHTTPMiddleware
-
-logger = structlog.get_logger(__name__)
-
 from collections.abc import Awaitable, Callable
 
+import structlog
+from asgi_correlation_id import correlation_id
+from fastapi import Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
+
+logger = structlog.get_logger(__name__)
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
@@ -21,12 +20,19 @@ class LoggingMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             process_time = time.perf_counter() - start_time
+
+            # Attach correlation ID as response header for client-side traceability
+            request_id = correlation_id.get()
+            if request_id:
+                response.headers["X-Request-ID"] = request_id
+
             logger.info(
                 "Request processed",
                 method=request.method,
                 url=str(request.url),
                 status_code=response.status_code,
                 duration_ms=round(process_time * 1000, 2),
+                request_id=request_id,
             )
             return response
         except Exception as exc:

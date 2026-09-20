@@ -1,9 +1,10 @@
 import datetime
 import uuid
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, column, delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.db.models.author import Author
 from app.db.models.category import Category
@@ -37,6 +38,8 @@ class PaperRepository(BaseRepository[Paper]):
             if existing_paper.content_hash == paper_data["content_hash"]:
                 hash_changed = False
 
+        now = datetime.datetime.now(datetime.UTC)
+
         insert_stmt = insert(Paper).values(
             arxiv_id=paper_data["arxiv_id"],
             version=paper_data["version"],
@@ -52,9 +55,8 @@ class PaperRepository(BaseRepository[Paper]):
             content_hash=paper_data["content_hash"],
             abs_url=paper_data["abs_url"],
             pdf_url=paper_data["pdf_url"],
+            last_synced_at=now,
         )
-
-        from sqlalchemy import column
 
         # The DO UPDATE action checks if the new row is newer or the content changed
         update_stmt = insert_stmt.on_conflict_do_update(
@@ -103,8 +105,6 @@ class PaperRepository(BaseRepository[Paper]):
         # Actually, if we just delete paper_authors and paper_categories, we can re-insert.
 
         # 1. Clean existing joins
-        from sqlalchemy import delete
-
         await self.session.execute(delete(PaperAuthor).where(PaperAuthor.paper_id == paper_id))
         await self.session.execute(delete(PaperCategory).where(PaperCategory.paper_id == paper_id))
 
@@ -141,8 +141,6 @@ class PaperRepository(BaseRepository[Paper]):
         Sorted by (published_at DESC, id DESC).
         """
         # We need eager loading for authors and categories to serialize to API easily
-        from sqlalchemy.orm import selectinload
-
         stmt = select(Paper).options(
             selectinload(Paper.authors).selectinload(PaperAuthor.author),
             selectinload(Paper.categories).selectinload(PaperCategory.category),
@@ -179,8 +177,6 @@ class PaperRepository(BaseRepository[Paper]):
         return list(result.scalars().all())
 
     async def get_by_arxiv_id(self, arxiv_id: str) -> Paper | None:
-        from sqlalchemy.orm import selectinload
-
         stmt = (
             select(Paper)
             .options(

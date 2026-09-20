@@ -38,6 +38,8 @@ def engine(db_url):
     engine.sync_engine.dispose()
 
 
+from sqlalchemy import text
+
 @pytest_asyncio.fixture()
 async def db_session(engine):
     """
@@ -51,9 +53,7 @@ async def db_session(engine):
     async with async_session() as session:
         # Truncate tables on setup to ensure clean state for the test
         await session.execute(
-            __import__("sqlalchemy").text(
-                "TRUNCATE TABLE papers, authors, categories, ingest_runs CASCADE"
-            )
+            text("TRUNCATE TABLE papers, authors, categories, ingest_runs CASCADE")
         )
         await session.commit()
 

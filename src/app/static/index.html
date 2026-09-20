@@ -45,7 +45,7 @@
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 12px;
             padding-right: 5px;
         }
 
@@ -158,8 +158,7 @@
             background: rgba(0, 0, 0, 0.2);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 15px;
-            margin-top: auto;
+            padding: 12px;
         }
 
         @keyframes fadeIn {
@@ -174,6 +173,32 @@
             }
         }
 
+        .summary-stats {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .stat-box {
+            flex: 1;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-box .value {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: white;
+        }
+
+        .stat-box .label {
+            font-size: 0.75em;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
         .loading {
             align-self: center;
             color: var(--text-muted);
@@ -187,22 +212,36 @@
 
     <div class="sidebar">
         <h2>arXiv Insight</h2>
-        <!-- <p style="color: var(--text-muted); font-size: 0.9em;">Ask questions against thousands of AI papers instantly.</p> -->
+        
+        <div class="summary-stats">
+            <div class="stat-box">
+                <div class="value" id="statPapers">-</div>
+                <div class="label">Papers</div>
+            </div>
+            <div class="stat-box">
+                <div class="value" id="statAuthors">-</div>
+                <div class="label">Authors</div>
+            </div>
+            <div class="stat-box">
+                <div class="value" id="statCategories">-</div>
+                <div class="label">Categories</div>
+            </div>
+        </div>
 
         <div class="charts-scroll-area">
             <div class="chart-container">
-                <h3 style="font-size: 14px; margin-top:0;">Ingestion Timeline</h3>
-                <canvas id="timelineChart" height="200"></canvas>
+                <h3 style="font-size: 14px; margin-top:0; margin-bottom: 8px;">Ingestion Timeline</h3>
+                <canvas id="timelineChart" height="130"></canvas>
             </div>
 
             <div class="chart-container">
-                <h3 style="font-size: 14px; margin-top:0;">Top Categories</h3>
-                <canvas id="categoriesChart" height="200"></canvas>
+                <h3 style="font-size: 14px; margin-top:0; margin-bottom: 8px;">Top Categories</h3>
+                <canvas id="categoriesChart" height="130"></canvas>
             </div>
 
             <div class="chart-container">
-                <h3 style="font-size: 14px; margin-top:0;">Top Authors</h3>
-                <canvas id="authorsChart" height="200"></canvas>
+                <h3 style="font-size: 14px; margin-top:0; margin-bottom: 8px;">Top Authors</h3>
+                <canvas id="authorsChart" height="130"></canvas>
             </div>
         </div>
     </div>
@@ -232,10 +271,26 @@
 
         async function loadCharts() {
             try {
+                // Fetch all visualization data at once
+                const res = await fetch(`/api/v1/stats/visualization?_=${Date.now()}`);
+                if (!res.ok) {
+                    console.error("Failed to load visualization data");
+                    return;
+                }
+                
+                const response = await res.json();
+                const vizData = response.data;
+
+                // 0. Populate Summary Stats
+                if (vizData.summary) {
+                    document.getElementById('statPapers').textContent = vizData.summary.total_papers.toLocaleString();
+                    document.getElementById('statAuthors').textContent = vizData.summary.total_authors.toLocaleString();
+                    document.getElementById('statCategories').textContent = vizData.summary.total_categories.toLocaleString();
+                }
+
                 // 1. Timeline Chart
-                const resTimeline = await fetch(`/api/v1/stats/papers-over-time?granularity=month&_=${Date.now()}`);
-                if (resTimeline.ok) {
-                    const data = await resTimeline.json();
+                if (vizData.papers_over_time) {
+                    const data = vizData.papers_over_time;
                     const labels = data.map(d => new Date(d.period).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }));
                     const counts = data.map(d => d.count);
                     new Chart(document.getElementById('timelineChart').getContext('2d'), {
@@ -256,9 +311,8 @@
                 }
 
                 // 2. Categories Chart (Bar)
-                const resCats = await fetch(`/api/v1/stats/top-categories?limit=5&_=${Date.now()}`);
-                if (resCats.ok) {
-                    const data = await resCats.json();
+                if (vizData.top_categories) {
+                    const data = vizData.top_categories;
                     new Chart(document.getElementById('categoriesChart').getContext('2d'), {
                         type: 'bar',
                         data: {
@@ -275,9 +329,8 @@
                 }
 
                 // 3. Authors Chart (Horizontal Bar)
-                const resAuthors = await fetch(`/api/v1/stats/top-authors?limit=5&_=${Date.now()}`);
-                if (resAuthors.ok) {
-                    const data = await resAuthors.json();
+                if (vizData.top_authors) {
+                    const data = vizData.top_authors;
                     new Chart(document.getElementById('authorsChart').getContext('2d'), {
                         type: 'bar',
                         data: {

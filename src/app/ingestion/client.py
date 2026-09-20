@@ -79,12 +79,20 @@ class ArxivClient:
                 # However, this might actually be the end of the results.
                 # A safer heuristic: arXiv's "empty" response is often missing opensearch:totalResults or has it as 0.
                 if "<entry>" not in text and max_results > 0:
-                    # Let's inspect the feed size.
-                    # If this is not the end of the pagination, it's a glitch.
-                    # We will rely on the caller or parser to determine if it's a true empty vs glitch,
-                    # but for now, we will let the parser handle it, OR we raise here if we know it's a glitch.
-                    # Actually, we can raise here if the search_query is broad and we are at start=0.
-                    pass
+                    # If this is the first page (start=0), an empty feed is almost certainly
+                    # a transient arXiv glitch — raise to trigger tenacity retries.
+                    # For later pages, an empty feed is the normal end-of-results signal.
+                    if start == 0:
+                        raise ArxivEmptyFeedError(
+                            f"Expected results for '{search_query}' at start={start} "
+                            f"but received empty feed (no <entry> tags)."
+                        )
+                    else:
+                        logger.info(
+                            "No <entry> tags found — likely end of results",
+                            start=start,
+                            search_query=search_query,
+                        )
 
                 return text
 

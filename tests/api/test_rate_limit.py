@@ -1,16 +1,16 @@
+from typing import Any, AsyncGenerator
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app.api.limiter import limiter
 from app.db.session import get_db_session
 from app.main import app
-from typing import Any, AsyncGenerator
 
 
-async def mock_db_session()->AsyncMock:
+async def mock_db_session() -> AsyncGenerator[AsyncMock, None]:
     # Return a dummy mock that doesn't actually hit postgres
-    from unittest.mock import AsyncMock, MagicMock
-
     mock_session = AsyncMock()
     # Mock the return values for the stats endpoint
     mock_session.scalar = AsyncMock(return_value=1)

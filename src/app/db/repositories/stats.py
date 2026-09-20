@@ -1,7 +1,7 @@
 import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.author import Author
@@ -14,6 +14,19 @@ from app.db.models.paper import Paper, PaperAuthor, PaperCategory
 class StatsRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def wipe_all(self) -> None:
+        """
+        Truncates all data tables with RESTART IDENTITY CASCADE.
+        Explicitly lists paper_embeddings to ensure sequences are reset.
+        """
+        await self.session.execute(
+            text(
+                "TRUNCATE papers, authors, categories, paper_embeddings, "
+                "ingest_runs RESTART IDENTITY CASCADE"
+            )
+        )
+        await self.session.commit()
 
     async def get_papers_over_time(
         self,
