@@ -47,7 +47,7 @@ class RagService:
             query_text=request.question,
             query_vector=query_vector,
             limit=50,
-            tau=0.5
+            tau=0.75
         )
         t_ret = time.time() - t_ret_start
         

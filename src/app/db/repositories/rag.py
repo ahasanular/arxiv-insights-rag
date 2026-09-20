@@ -37,7 +37,7 @@ class RagRepository:
         query_text: str, 
         query_vector: List[float], 
         limit: int = 50,
-        tau: float = 0.5
+        tau: float = 0.75
     ) -> Tuple[List[Dict[str, Any]], bool]:
         """
         Executes a hybrid search using pgvector (cosine similarity) and ts_rank_cd.

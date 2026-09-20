@@ -61,6 +61,24 @@ class LlmService:
         if provider == LLMProvider.NONE or not settings.LLM_API_KEY:
             # Fallback behavior if no key or provider=none
             logger.info("Using no-key fallback (extractive) for RAG")
+            
+            # Simple lexical sanity check to act as a fallback relevance gate
+            import re
+            words = set(re.findall(r'\b\w+\b', question.lower()))
+            stop_words = {"who", "what", "where", "when", "why", "how", "is", "are", "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "with", "of", "does", "do", "can"}
+            meaningful_words = words - stop_words
+            
+            combined_text = " ".join([f"{d['title']} {d['abstract']}".lower() for d in documents])
+            
+            # If the user asked something with meaningful words, and NONE of them appear in any of the top docs, abstain.
+            if meaningful_words and not any(w in combined_text for w in meaningful_words):
+                return RagResponseSchema(
+                    answer="No papers in the corpus contain the concepts mentioned in your question.",
+                    used_source_ids=[],
+                    confidence=0.0,
+                    insufficient_context=True
+                ), True
+                
             top_docs = documents[:3]
             answer = "Based on the retrieved papers:\n\n"
             used_ids = []

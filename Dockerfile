@@ -5,20 +5,19 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
-COPY requirements.txt ./
-
 # Upgrade pip and install dependencies into a wheelhouse/virtual environment
 RUN python -m venv /app/.venv
 RUN /app/.venv/bin/pip install --default-timeout=1000 --no-cache-dir -U pip setuptools wheel
-RUN /app/.venv/bin/pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
 # Download embedding model weights to bake into image
-# Doing this in builder so it caches well
+# We pip install fastembed first just to run the download script before the full project copy
+RUN /app/.venv/bin/pip install --default-timeout=1000 --no-cache-dir fastembed>=0.2.7
 ENV HF_HOME=/app/model_cache
 RUN /app/.venv/bin/python -c "from fastembed import TextEmbedding; TextEmbedding('BAAI/bge-small-en-v1.5')"
 
+# Copy full source code
 COPY . .
-# Install the project itself (which registers agy-ingest in .venv/bin)
+# Install the project itself in editable mode so it reads static files directly from /app/src
 RUN /app/.venv/bin/pip install --default-timeout=1000 --no-cache-dir -e .
 
 # Final stage

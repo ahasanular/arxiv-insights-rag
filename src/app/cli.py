@@ -6,9 +6,9 @@ import typer
 
 from app.db.repositories.author import AuthorRepository
 from app.db.repositories.category import CategoryRepository
+from app.db.repositories.embedding import EmbeddingRepository
 from app.db.repositories.paper import PaperRepository
 from app.db.repositories.run import RunRepository
-from app.db.repositories.embedding import EmbeddingRepository
 from app.db.session import async_session_maker
 from app.ingestion.client import ArxivClient
 from app.ingestion.service import IngestionService
@@ -86,6 +86,37 @@ def reindex(
     (Not fully implemented, will be done later)
     """
     typer.echo("Embedding indexer stub. Will be fully wired in Phase 4.")
+
+
+@app.command()
+def eval(
+    tau: Annotated[float, typer.Option("--tau", help="Cosine similarity threshold for relevance gate")] = 0.75,
+):
+    """
+    Runs the RAG evaluation harness (Recall@5, MRR, Abstention Precision).
+    """
+    async def _eval():
+        from app.services.evaluation import EvaluationService
+        embedder = EmbedderService()
+        svc = EvaluationService(embedder)
+
+        typer.echo(f"Starting RAG Evaluation (tau={tau})...")
+        metrics = await svc.run_evaluation(tau=tau)
+
+        typer.echo("\n--- Evaluation Results ---")
+        for k, v in metrics.items():
+            if k not in ("in_corpus_questions", "out_of_corpus_questions"):
+                typer.echo(f"{k}: {v}")
+
+        typer.echo("\n[In-Corpus Questions]")
+        for q in metrics.get("in_corpus_questions", []):
+            typer.echo(f" - {q}")
+
+        typer.echo("\n[Out-of-Corpus Questions]")
+        for q in metrics.get("out_of_corpus_questions", []):
+            typer.echo(f" - {q}")
+
+    run_async(_eval())
 
 
 @app.command()
