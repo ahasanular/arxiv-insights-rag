@@ -3,12 +3,12 @@ import uuid
 
 from sqlalchemy import (
     DateTime,
+    FetchedValue,
     ForeignKey,
     Index,
     Integer,
     String,
     Text,
-    FetchedValue,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,9 +30,7 @@ class PaperAuthor(Base):
     author: Mapped["Author"] = relationship("Author")
 
     # Indexes
-    __table_args__ = (
-        Index("ix_paper_authors_author_id", "author_id"),
-    )
+    __table_args__ = (Index("ix_paper_authors_author_id", "author_id"),)
 
 
 class PaperCategory(Base):
@@ -48,17 +46,13 @@ class PaperCategory(Base):
 
     category: Mapped["Category"] = relationship("Category")
 
-    __table_args__ = (
-        Index("ix_paper_categories_category_id_paper_id", "category_id", "paper_id"),
-    )
+    __table_args__ = (Index("ix_paper_categories_category_id_paper_id", "category_id", "paper_id"),)
 
 
 class Paper(Base):
     __tablename__ = "papers"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     arxiv_id: Mapped[str] = mapped_column(String, unique=True, index=True)
     version: Mapped[int] = mapped_column(Integer)
     title: Mapped[str] = mapped_column(String)
@@ -66,14 +60,19 @@ class Paper(Base):
     abstract: Mapped[str] = mapped_column(Text)
 
     published_at: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), index=True)
-    updated_at_source: Mapped[datetime.datetime] = mapped_column(DateTime(timezone=True), index=True)
+    updated_at_source: Mapped[datetime.datetime] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
 
     doi: Mapped[str | None] = mapped_column(String, nullable=True)
     journal_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     primary_category_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True
+        UUID(as_uuid=True),
+        ForeignKey("categories.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     content_hash: Mapped[str] = mapped_column(String)
@@ -97,6 +96,4 @@ class Paper(Base):
         "PaperCategory", backref="paper", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (
-        Index("ix_papers_search_vector", "search_vector", postgresql_using="gin"),
-    )
+    __table_args__ = (Index("ix_papers_search_vector", "search_vector", postgresql_using="gin"),)

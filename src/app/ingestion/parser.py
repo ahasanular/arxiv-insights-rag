@@ -21,6 +21,7 @@ def parse_arxiv_response(xml_text: str) -> list[PaperDTO]:
         root = etree.parse(BytesIO(xml_text.encode("utf-8")), parser)
     except etree.XMLSyntaxError as e:
         import structlog
+
         logger = structlog.get_logger(__name__)
         logger.error("XML parsing error", error=str(e))
         return []
@@ -44,9 +45,7 @@ def parse_arxiv_response(xml_text: str) -> list[PaperDTO]:
         doi = _get_text(entry, "./arxiv:doi")
         journal_ref = _get_text(entry, "./arxiv:journal_ref")
         comment = _get_text(entry, "./arxiv:comment")
-        primary_category = entry.xpath(
-            "./arxiv:primary_category/@term", namespaces=NAMESPACES
-        )
+        primary_category = entry.xpath("./arxiv:primary_category/@term", namespaces=NAMESPACES)
         primary_category_term = primary_category[0] if primary_category else None
 
         # Authors

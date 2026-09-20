@@ -75,18 +75,22 @@ def normalize_paper(dto: PaperDTO) -> dict[str, any]:
 
     normalized_authors = []
     for pos, author in enumerate(dto.authors):
-        normalized_authors.append({
-            "display_name": author.name,
-            "normalized_name": normalize_author_name(author.name),
-            "position": pos,
-        })
+        normalized_authors.append(
+            {
+                "display_name": author.name,
+                "normalized_name": normalize_author_name(author.name),
+                "position": pos,
+            }
+        )
 
     normalized_categories = []
     for cat in dto.categories:
-        normalized_categories.append({
-            "code": cat.term,
-            "is_primary": cat.term == dto.primary_category,
-        })
+        normalized_categories.append(
+            {
+                "code": cat.term,
+                "is_primary": cat.term == dto.primary_category,
+            }
+        )
 
     abstract_clean = normalize_abstract(dto.summary)
 

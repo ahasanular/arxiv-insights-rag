@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routers import papers, stats, rag
+from app.api.routers import papers, rag, stats
 
 api_router = APIRouter()
 api_router.include_router(papers.router)

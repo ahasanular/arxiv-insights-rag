@@ -16,6 +16,7 @@ logger = structlog.get_logger(__name__)
 
 class ArxivEmptyFeedError(Exception):
     """Raised when arXiv returns an empty feed unexpectedly."""
+
     pass
 
 
@@ -54,7 +55,9 @@ class ArxivClient:
         ):
             with attempt:
                 await self._throttle()
-                logger.info("Fetching from arXiv", params=params, attempt=attempt.retry_state.attempt_number)
+                logger.info(
+                    "Fetching from arXiv", params=params, attempt=attempt.retry_state.attempt_number
+                )
 
                 response = await self.client.get(self.base_url, params=params)
 

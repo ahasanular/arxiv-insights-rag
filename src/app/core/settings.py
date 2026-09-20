@@ -1,7 +1,8 @@
-import os
 from enum import Enum
-from pydantic import PostgresDsn, field_validator, ValidationInfo
+
+from pydantic import ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class LLMProvider(str, Enum):
     NONE = "none"
@@ -45,19 +46,21 @@ class Settings(BaseSettings):
     LLM_PROVIDER: LLMProvider = LLMProvider.NONE
     LLM_MODEL: str = "gpt-4o-mini"
     LLM_API_KEY: str | None = None
-    
+
     # We will auto-resolve the base url to prevent wrong configurations
     LLM_BASE_URL: str | None = None
-    
+
     EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     EMBEDDING_DIM: int = 384
-    
+
     @field_validator("LLM_API_KEY")
     @classmethod
     def validate_llm_key(cls, v: str | None, info: ValidationInfo) -> str | None:
         provider = info.data.get("LLM_PROVIDER", LLMProvider.NONE)
         if provider != LLMProvider.NONE and not v:
-            raise ValueError(f"LLM_API_KEY is absolutely required when LLM_PROVIDER is '{provider.value}'")
+            raise ValueError(
+                f"LLM_API_KEY is absolutely required when LLM_PROVIDER is '{provider.value}'"
+            )
         return v
 
     @field_validator("LLM_BASE_URL", mode="before")
@@ -66,7 +69,7 @@ class Settings(BaseSettings):
         # If the user explicitly sets a base URL (for local proxies/ollama), allow it
         if v:
             return v
-        
+
         # Otherwise, strictly enforce the correct API endpoint for the chosen provider
         provider = info.data.get("LLM_PROVIDER", LLMProvider.NONE)
         if provider == LLMProvider.GROQ:
@@ -75,7 +78,8 @@ class Settings(BaseSettings):
             return "https://openrouter.ai/api/v1"
         elif provider == LLMProvider.GEMINI:
             return "https://generativelanguage.googleapis.com/v1beta/openai/"
-        
-        return None # Default for OpenAI or None
+
+        return None  # Default for OpenAI or None
+
 
 settings = Settings()  # type: ignore

@@ -1,17 +1,22 @@
 import time
+
+import structlog
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-import structlog
 
 logger = structlog.get_logger(__name__)
 
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
+
 from starlette.responses import Response
 
+
 class LoggingMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         start_time = time.perf_counter()
-        
+
         # Process the request
         try:
             response = await call_next(request)
@@ -21,7 +26,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 method=request.method,
                 url=str(request.url),
                 status_code=response.status_code,
-                duration_ms=round(process_time * 1000, 2)
+                duration_ms=round(process_time * 1000, 2),
             )
             return response
         except Exception as exc:
@@ -31,6 +36,6 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 method=request.method,
                 url=str(request.url),
                 duration_ms=round(process_time * 1000, 2),
-                exc_info=exc
+                exc_info=exc,
             )
             raise

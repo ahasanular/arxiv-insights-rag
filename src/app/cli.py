@@ -22,6 +22,7 @@ app = typer.Typer(
     add_completion=False,
 )
 
+
 def run_async(coro):
     """Helper to run async commands."""
     return asyncio.run(coro)
@@ -29,9 +30,15 @@ def run_async(coro):
 
 @app.command()
 def ingest(
-    categories: Annotated[str, typer.Option("--categories", "-c", help="Search query/categories")] = "cat:cs.AI OR cat:cs.LG OR cat:cs.CL",
-    max_results: Annotated[int, typer.Option("--max-results", "-m", help="Maximum papers to fetch")] = 100,
-    since_last: Annotated[bool, typer.Option("--since-last", help="Stop after encountering unchanged papers")] = False,
+    categories: Annotated[
+        str, typer.Option("--categories", "-c", help="Search query/categories")
+    ] = "cat:cs.AI OR cat:cs.LG OR cat:cs.CL",
+    max_results: Annotated[
+        int, typer.Option("--max-results", "-m", help="Maximum papers to fetch")
+    ] = 100,
+    since_last: Annotated[
+        bool, typer.Option("--since-last", help="Stop after encountering unchanged papers")
+    ] = False,
     resume: Annotated[int, typer.Option("--resume", help="Resume from specific offset")] = 0,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Do not persist to DB")] = False,
 ):
@@ -56,7 +63,9 @@ def ingest(
                 embedder=embedder,
             )
 
-            typer.echo(f"Starting ingestion: query='{categories}', max={max_results}, incremental={since_last}")
+            typer.echo(
+                f"Starting ingestion: query='{categories}', max={max_results}, incremental={since_last}"
+            )
             run = await svc.ingest_papers(
                 search_query=categories,
                 max_results=max_results,
@@ -64,12 +73,14 @@ def ingest(
                 resume_cursor=resume,
             )
 
-            typer.echo(f"Ingestion {run.status}: "
-                       f"fetched={run.fetched}, "
-                       f"inserted={run.inserted}, "
-                       f"updated={run.updated}, "
-                       f"unchanged={run.unchanged}, "
-                       f"failed={run.failed}")
+            typer.echo(
+                f"Ingestion {run.status}: "
+                f"fetched={run.fetched}, "
+                f"inserted={run.inserted}, "
+                f"updated={run.updated}, "
+                f"unchanged={run.unchanged}, "
+                f"failed={run.failed}"
+            )
 
         await client.close()
 
@@ -79,7 +90,9 @@ def ingest(
 @app.command()
 def reindex(
     all: Annotated[bool, typer.Option("--all", help="Reindex all papers")] = False,
-    missing: Annotated[bool, typer.Option("--missing", help="Reindex papers missing embeddings")] = True,
+    missing: Annotated[
+        bool, typer.Option("--missing", help="Reindex papers missing embeddings")
+    ] = True,
 ):
     """
     Triggers the embedding indexer.
@@ -90,13 +103,17 @@ def reindex(
 
 @app.command()
 def eval(
-    tau: Annotated[float, typer.Option("--tau", help="Cosine similarity threshold for relevance gate")] = 0.75,
+    tau: Annotated[
+        float, typer.Option("--tau", help="Cosine similarity threshold for relevance gate")
+    ] = 0.75,
 ):
     """
     Runs the RAG evaluation harness (Recall@5, MRR, Abstention Precision).
     """
+
     async def _eval():
         from app.services.evaluation import EvaluationService
+
         embedder = EmbedderService()
         svc = EvaluationService(embedder)
 
@@ -132,9 +149,12 @@ def wipe(
 
     async def _wipe():
         from sqlalchemy import text
+
         async with async_session_maker() as session:
             # CASCADE on papers deletes paper_authors, paper_categories, paper_embeddings
-            await session.execute(text("TRUNCATE papers, authors, categories, ingest_runs RESTART IDENTITY CASCADE"))
+            await session.execute(
+                text("TRUNCATE papers, authors, categories, ingest_runs RESTART IDENTITY CASCADE")
+            )
             await session.commit()
             typer.echo("Database wiped successfully.")
 
@@ -146,8 +166,10 @@ def status():
     """
     Displays current DB counts and the last successful ingest run.
     """
+
     async def _status():
         from sqlalchemy import text
+
         async with async_session_maker() as session:
             papers = await session.scalar(text("SELECT COUNT(*) FROM papers"))
             authors = await session.scalar(text("SELECT COUNT(*) FROM authors"))

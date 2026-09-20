@@ -35,7 +35,7 @@ SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 
-def test_parser_valid_xml():
+def test_parser_valid_xml()->None:
     dtos = parse_arxiv_response(SAMPLE_XML)
     assert len(dtos) == 1
     dto = dtos[0]
@@ -54,7 +54,7 @@ def test_parser_valid_xml():
     assert dto.categories[0].term == "cs.AI"
 
 
-def test_normalizer_datetime():
+def test_normalizer_datetime()->None:
     dt = normalize_datetime("2024-01-25T14:30:00Z")
     assert dt.year == 2024
     assert dt.month == 1
@@ -62,7 +62,7 @@ def test_normalizer_datetime():
     assert dt.tzinfo == datetime.UTC
 
 
-def test_normalizer_author_name():
+def test_normalizer_author_name()->None:
     # Casefolding and punctuation stripping
     assert normalize_author_name("John D. O'Connor") == "john d oconnor"
     # Unicode decomposition (é -> e)
@@ -71,7 +71,7 @@ def test_normalizer_author_name():
     assert normalize_author_name("A  B   C") == "a b c"
 
 
-def test_normalizer_abstract():
+def test_normalizer_abstract()->None:
     raw = "This is the abstract.\n\nIt has newlines and \x00 control chars."
     clean = normalize_abstract(raw)
     assert "newlines and control chars" in clean
@@ -79,7 +79,7 @@ def test_normalizer_abstract():
     assert "\n" not in clean
 
 
-def test_parse_arxiv_id_and_version():
+def test_parse_arxiv_id_and_version()->None:
     arxiv_id, version = parse_arxiv_id_and_version("http://arxiv.org/abs/2401.12345v2")
     assert arxiv_id == "2401.12345"
     assert version == 2

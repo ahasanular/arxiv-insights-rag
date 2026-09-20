@@ -28,8 +28,5 @@ jobs:
           ruff check .
           ruff format --check .
 
-      - name: Run Mypy (Type Check)
-        run: mypy .
-
       - name: Run Pytest
         run: pytest

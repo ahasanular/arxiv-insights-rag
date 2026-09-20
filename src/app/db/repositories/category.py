@@ -20,21 +20,13 @@ class CategoryRepository(BaseRepository[Category]):
             return {}
 
         insert_stmt = insert(Category).values(
-            [
-                {
-                    "code": c["code"],
-                    "label": c.get("label")
-                }
-                for c in categories_data
-            ]
+            [{"code": c["code"], "label": c.get("label")} for c in categories_data]
         )
 
         # On conflict (code), we can update the label if we want.
         update_stmt = insert_stmt.on_conflict_do_update(
-            index_elements=["code"],
-            set_={"label": insert_stmt.excluded.label}
+            index_elements=["code"], set_={"label": insert_stmt.excluded.label}
         ).returning(Category.code, Category.id)
 
         result = await self.session.execute(update_stmt)
         return {row.code: row.id for row in result.all()}
-

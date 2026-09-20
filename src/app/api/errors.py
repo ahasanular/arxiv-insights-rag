@@ -1,9 +1,9 @@
-from fastapi import Request
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from slowapi.errors import RateLimitExceeded
 import structlog
+from fastapi import Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 logger = structlog.get_logger(__name__)
 
@@ -12,20 +12,26 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRe
     """
     Handles SlowAPI RateLimitExceeded and maps it to our standardized error envelope.
     """
-    logger.warning("Rate limit exceeded", client=request.client.host if request.client else "unknown", path=request.url.path)
+    logger.warning(
+        "Rate limit exceeded",
+        client=request.client.host if request.client else "unknown",
+        path=request.url.path,
+    )
     return JSONResponse(
         status_code=429,
         content={
             "error": {
                 "code": "TOO_MANY_REQUESTS",
                 "message": "Rate limit exceeded. Please try again later.",
-                "details": str(exc.detail)
+                "details": str(exc.detail),
             }
         },
     )
 
 
-async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
     """
     Transforms Pydantic validation errors into our standardized envelope.
     """
@@ -35,7 +41,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "error": {
                 "code": "VALIDATION_ERROR",
                 "message": "The request data was invalid.",
-                "details": exc.errors()
+                "details": exc.errors(),
             }
         },
     )
@@ -47,13 +53,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     """
     return JSONResponse(
         status_code=exc.status_code,
-        content={
-            "error": {
-                "code": "HTTP_ERROR",
-                "message": str(exc.detail),
-                "details": None
-            }
-        },
+        content={"error": {"code": "HTTP_ERROR", "message": str(exc.detail), "details": None}},
     )
 
 
@@ -68,7 +68,7 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
             "error": {
                 "code": "INTERNAL_SERVER_ERROR",
                 "message": "An unexpected error occurred.",
-                "details": None
+                "details": None,
             }
         },
     )

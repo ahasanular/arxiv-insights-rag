@@ -1,26 +1,25 @@
 import re
-from typing import List, Dict, Any, Tuple
+from typing import Any
+
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, text
-from app.db.models.paper import Paper, PaperCategory
-from app.db.models.category import Category
-from app.db.models.embedding import PaperEmbedding
+
 
 class RagRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    def extract_prefilters(self, question: str) -> Tuple[List[str], List[str]]:
+    def extract_prefilters(self, question: str) -> tuple[list[str], list[str]]:
         """
         Extracts years and categories from the question for deterministic filtering.
         Returns: (years, categories)
         """
         years = re.findall(r"\b(19|20)\d{2}\b", question)
         years = list(set(years))  # Deduplicate
-        
+
         categories = re.findall(r"cs\.[a-zA-Z]{2}\b", question, re.IGNORECASE)
         categories = list(set([c.lower() for c in categories]))
-        
+
         return years, categories
 
     def is_aggregate_intent(self, question: str) -> bool:
@@ -33,12 +32,8 @@ class RagRepository:
         return False
 
     async def hybrid_search(
-        self, 
-        query_text: str, 
-        query_vector: List[float], 
-        limit: int = 50,
-        tau: float = 0.75
-    ) -> Tuple[List[Dict[str, Any]], bool]:
+        self, query_text: str, query_vector: list[float], limit: int = 50, tau: float = 0.75
+    ) -> tuple[list[dict[str, Any]], bool]:
         """
         Executes a hybrid search using pgvector (cosine similarity) and ts_rank_cd.
         Combines results using Reciprocal Rank Fusion (RRF).
@@ -47,10 +42,10 @@ class RagRepository:
             - should_abstain (boolean) indicating if the results fell below the relevance gate.
         """
         years, categories = self.extract_prefilters(query_text)
-        
+
         # We will use raw SQL for the RRF query for maximum control and performance,
         # but we use SQLAlchemy text() and bind parameters securely.
-        
+
         sql = """
         WITH vector_search AS (
             SELECT 
@@ -61,7 +56,7 @@ class RagRepository:
             JOIN paper_embeddings pe ON p.id = pe.paper_id
             WHERE 1=1
         """
-        
+
         # Inject deterministic prefilters if present
         if years:
             sql += " AND EXTRACT(YEAR FROM p.published_at) = ANY(:years)"
@@ -71,7 +66,7 @@ class RagRepository:
                 JOIN categories c ON pc.category_id = c.id 
                 WHERE pc.paper_id = p.id AND LOWER(c.code) = ANY(:categories)
             )"""
-            
+
         sql += """
             ORDER BY pe.embedding <=> :query_vector
             LIMIT :limit
@@ -92,7 +87,7 @@ class RagRepository:
             FROM papers p
             WHERE 1=1
         """
-        
+
         if years:
             sql += " AND EXTRACT(YEAR FROM p.published_at) = ANY(:years)"
         if categories:
@@ -101,7 +96,7 @@ class RagRepository:
                 JOIN categories c ON pc.category_id = c.id 
                 WHERE pc.paper_id = p.id AND LOWER(c.code) = ANY(:categories)
             )"""
-            
+
         sql += """
             ORDER BY fts_score DESC
             LIMIT :limit
@@ -131,39 +126,41 @@ class RagRepository:
         ORDER BY r.rrf_score DESC
         LIMIT 8
         """
-        
+
         params = {
             "query_text": query_text,
-            "query_vector": str(query_vector), # pgvector natively casts text '[...]' to vector
-            "limit": limit
+            "query_vector": str(query_vector),  # pgvector natively casts text '[...]' to vector
+            "limit": limit,
         }
         if years:
             params["years"] = [int(y) for y in years]
         if categories:
             params["categories"] = categories
-            
+
         result = await self.session.execute(text(sql), params)
         rows = result.fetchall()
-        
+
         # Map to dicts
         docs = []
         best_cosine = 0.0
         best_fts = 0.0
-        
+
         for row in rows:
             if row.cosine_sim > best_cosine:
                 best_cosine = row.cosine_sim
             if row.fts_score > best_fts:
                 best_fts = row.fts_score
-                
-            docs.append({
-                "arxiv_id": row.arxiv_id,
-                "title": row.title,
-                "abstract": row.abstract,
-                "published_at": row.published_at.isoformat(),
-                "score": round(row.rrf_score, 4)
-            })
-            
+
+            docs.append(
+                {
+                    "arxiv_id": row.arxiv_id,
+                    "title": row.title,
+                    "abstract": row.abstract,
+                    "published_at": row.published_at.isoformat(),
+                    "score": round(row.rrf_score, 4),
+                }
+            )
+
         # Relevance Gate (tau check)
         # If the best cosine similarity is worse than tau and FTS is ~0, we abstain.
         should_abstain = False
@@ -173,5 +170,5 @@ class RagRepository:
         else:
             # No documents retrieved at all
             should_abstain = True
-            
+
         return docs, should_abstain

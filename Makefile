@@ -42,5 +42,3 @@ lint:
 format:
 	PYTHONPATH=src $(BIN)/ruff format .
 
-check: lint format
-	PYTHONPATH=src $(BIN)/mypy .

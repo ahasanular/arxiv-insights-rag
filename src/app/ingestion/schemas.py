@@ -1,12 +1,13 @@
-
 from pydantic import BaseModel
 
 
 class AuthorDTO(BaseModel):
     name: str
 
+
 class CategoryDTO(BaseModel):
     term: str
+
 
 class PaperDTO(BaseModel):
     id: str  # e.g., http://arxiv.org/abs/2401.12345v2

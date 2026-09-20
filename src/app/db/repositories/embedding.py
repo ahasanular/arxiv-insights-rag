@@ -13,9 +13,10 @@ class EmbeddingRepository(BaseRepository[PaperEmbedding]):
         data: list of dicts with keys: paper_id, embedding, model, dimensions, content_hash
         """
         from sqlalchemy.dialects.postgresql import insert
+
         if not data:
             return
-            
+
         stmt = insert(PaperEmbedding).values(data)
         update_stmt = stmt.on_conflict_do_update(
             index_elements=["paper_id", "chunk_index", "model"],
@@ -24,6 +25,6 @@ class EmbeddingRepository(BaseRepository[PaperEmbedding]):
                 "model": stmt.excluded.model,
                 "dim": stmt.excluded.dim,
                 "content_hash": stmt.excluded.content_hash,
-            }
+            },
         )
         await self.session.execute(update_stmt)

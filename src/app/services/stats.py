@@ -76,9 +76,7 @@ class StatsService:
         cache_key = f"top_authors:{limit}:{category}:{start_date}:{end_date}"
 
         async def _fetch():
-            data = await self.stats_repo.get_top_authors(
-                limit, category, start_date, end_date
-            )
+            data = await self.stats_repo.get_top_authors(limit, category, start_date, end_date)
             return [TopAuthor(**d) for d in data]
 
         return await self._get_cached_or_fetch(cache_key, _fetch)

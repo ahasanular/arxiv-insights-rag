@@ -1,13 +1,13 @@
-import uuid
 import datetime
-from typing import Dict, Any, List
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, text
-from sqlalchemy.dialects.postgresql import insert
+import uuid
 
-from app.db.models.paper import Paper, PaperAuthor, PaperCategory
+from sqlalchemy import and_, select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.db.models.author import Author
 from app.db.models.category import Category
+from app.db.models.paper import Paper, PaperAuthor, PaperCategory
 from app.db.repositories.base import BaseRepository
 
 
@@ -19,7 +19,7 @@ class PaperRepository(BaseRepository[Paper]):
         self,
         paper_data: dict,
         author_ids: list[uuid.UUID],
-        categories_data: list[tuple[uuid.UUID, bool]]
+        categories_data: list[tuple[uuid.UUID, bool]],
     ) -> tuple[uuid.UUID | None, str, bool]:
         """
         Upserts a paper. Returns a tuple (paper_id, status) where status is one of
@@ -31,12 +31,12 @@ class PaperRepository(BaseRepository[Paper]):
         sel = select(Paper.content_hash, Paper.id).where(Paper.arxiv_id == paper_data["arxiv_id"])
         existing_row = await self.session.execute(sel)
         existing_paper = existing_row.one_or_none()
-        
+
         hash_changed = True
         if existing_paper:
             if existing_paper.content_hash == paper_data["content_hash"]:
                 hash_changed = False
-                
+
         insert_stmt = insert(Paper).values(
             arxiv_id=paper_data["arxiv_id"],
             version=paper_data["version"],
@@ -55,7 +55,7 @@ class PaperRepository(BaseRepository[Paper]):
         )
 
         from sqlalchemy import column
-        
+
         # The DO UPDATE action checks if the new row is newer or the content changed
         update_stmt = insert_stmt.on_conflict_do_update(
             index_elements=["arxiv_id"],
@@ -76,15 +76,12 @@ class PaperRepository(BaseRepository[Paper]):
             where=and_(
                 Paper.arxiv_id == insert_stmt.excluded.arxiv_id,
                 (
-                    (insert_stmt.excluded.updated_at_source > Paper.updated_at_source) |
-                    (insert_stmt.excluded.content_hash.is_distinct_from(Paper.content_hash)) |
-                    (insert_stmt.excluded.version > Paper.version)
-                )
-            )
-        ).returning(
-            Paper.id,
-            (column('xmax') == 0).label('inserted')
-        )
+                    (insert_stmt.excluded.updated_at_source > Paper.updated_at_source)
+                    | (insert_stmt.excluded.content_hash.is_distinct_from(Paper.content_hash))
+                    | (insert_stmt.excluded.version > Paper.version)
+                ),
+            ),
+        ).returning(Paper.id, (column("xmax") == 0).label("inserted"))
 
         result = await self.session.execute(update_stmt)
         row = result.one_or_none()
@@ -107,6 +104,7 @@ class PaperRepository(BaseRepository[Paper]):
 
         # 1. Clean existing joins
         from sqlalchemy import delete
+
         await self.session.execute(delete(PaperAuthor).where(PaperAuthor.paper_id == paper_id))
         await self.session.execute(delete(PaperCategory).where(PaperCategory.paper_id == paper_id))
 
@@ -137,7 +135,7 @@ class PaperRepository(BaseRepository[Paper]):
         cursor_published_at: datetime.datetime | None = None,
         cursor_id: uuid.UUID | None = None,
         limit: int = 20,
-    ) -> List[Paper]:
+    ) -> list[Paper]:
         """
         List papers with keyset pagination.
         Sorted by (published_at DESC, id DESC).
@@ -147,7 +145,7 @@ class PaperRepository(BaseRepository[Paper]):
 
         stmt = select(Paper).options(
             selectinload(Paper.authors).selectinload(PaperAuthor.author),
-            selectinload(Paper.categories).selectinload(PaperCategory.category)
+            selectinload(Paper.categories).selectinload(PaperCategory.category),
         )
 
         if category:
@@ -169,8 +167,8 @@ class PaperRepository(BaseRepository[Paper]):
         # (published_at, id) < (cursor_published_at, cursor_id)
         if cursor_published_at and cursor_id:
             stmt = stmt.where(
-                (Paper.published_at < cursor_published_at) |
-                ((Paper.published_at == cursor_published_at) & (Paper.id < cursor_id))
+                (Paper.published_at < cursor_published_at)
+                | ((Paper.published_at == cursor_published_at) & (Paper.id < cursor_id))
             )
 
         # Order must be stable and match the cursor direction
@@ -182,11 +180,15 @@ class PaperRepository(BaseRepository[Paper]):
 
     async def get_by_arxiv_id(self, arxiv_id: str) -> Paper | None:
         from sqlalchemy.orm import selectinload
-        stmt = select(Paper).options(
-            selectinload(Paper.authors).selectinload(PaperAuthor.author),
-            selectinload(Paper.categories).selectinload(PaperCategory.category)
-        ).where(Paper.arxiv_id == arxiv_id)
+
+        stmt = (
+            select(Paper)
+            .options(
+                selectinload(Paper.authors).selectinload(PaperAuthor.author),
+                selectinload(Paper.categories).selectinload(PaperCategory.category),
+            )
+            .where(Paper.arxiv_id == arxiv_id)
+        )
 
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
-

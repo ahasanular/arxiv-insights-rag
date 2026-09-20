@@ -33,4 +33,4 @@ python -m app.cli eval --tau 0.75
 ```
 *(or via `make eval`)*
 
-The script dynamically picks random valid papers from your local DB to form the in-corpus queries and mixes them with fixed out-of-corpus queries to test the abstention mechanism.
+The script dynamically picks random valid papers from your local DB to form the in-corpus queries. It also mixes in out-of-corpus queries, but first verifies via Full-Text Search (FTS) that these concepts do not actually exist in your database before using them, ensuring the abstention test is completely mathematically sound.

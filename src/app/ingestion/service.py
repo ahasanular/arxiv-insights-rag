@@ -1,16 +1,15 @@
-
 import structlog
 
 from app.db.models.ingest_run import IngestRun
 from app.db.repositories.author import AuthorRepository
 from app.db.repositories.category import CategoryRepository
+from app.db.repositories.embedding import EmbeddingRepository
 from app.db.repositories.paper import PaperRepository
 from app.db.repositories.run import RunRepository
-from app.db.repositories.embedding import EmbeddingRepository
-from app.services.embedder import EmbedderService
 from app.ingestion.client import ArxivClient, ArxivEmptyFeedError
 from app.ingestion.normalizer import normalize_paper
 from app.ingestion.parser import parse_arxiv_response
+from app.services.embedder import EmbedderService
 
 logger = structlog.get_logger(__name__)
 
@@ -43,7 +42,11 @@ class IngestionService:
     ) -> IngestRun:
         run = IngestRun(
             mode="incremental" if since_last else "full",
-            params={"search_query": search_query, "max_results": max_results, "resume": resume_cursor},
+            params={
+                "search_query": search_query,
+                "max_results": max_results,
+                "resume": resume_cursor,
+            },
         )
         self.run_repo.add(run)
         await self.run_repo.session.commit()
@@ -60,7 +63,9 @@ class IngestionService:
                 logger.info("Fetching page", start=start, fetch_size=fetch_size)
 
                 try:
-                    xml_text = await self.client.fetch_page(search_query, start=start, max_results=fetch_size)
+                    xml_text = await self.client.fetch_page(
+                        search_query, start=start, max_results=fetch_size
+                    )
                 except ArxivEmptyFeedError:
                     logger.error("Arxiv returned an empty feed after retries. Aborting run.")
                     run.status = "failed"
@@ -92,7 +97,9 @@ class IngestionService:
                         # 1. Bulk Upsert Authors
                         authors_map = await self.author_repo.bulk_upsert(normalized["authors"])
                         # Create ordered author_ids
-                        author_ids = [authors_map[a["normalized_name"]] for a in normalized["authors"]]
+                        author_ids = [
+                            authors_map[a["normalized_name"]] for a in normalized["authors"]
+                        ]
 
                         # 2. Bulk Upsert Categories
                         cats_map = await self.category_repo.bulk_upsert(normalized["categories"])
@@ -102,20 +109,22 @@ class IngestionService:
 
                         # Fix up the primary category ID for the paper
                         primary_code = normalized.pop("primary_category_code", None)
-                        normalized["primary_category_id"] = cats_map.get(primary_code) if primary_code else None
+                        normalized["primary_category_id"] = (
+                            cats_map.get(primary_code) if primary_code else None
+                        )
 
                         # 3. Upsert Paper and relationships
                         paper_id, status, hash_changed = await self.paper_repo.upsert_paper(
                             normalized, author_ids, category_data
                         )
-                        
+
                         if hash_changed:
                             # 4. We need to embed this paper
                             text_to_embed = f"{normalized['title']}\n\n{normalized['abstract']}"
                             # fastembed is synchronous but very fast locally; ideally run in executor
                             # but for ingestion script we can block briefly
                             vector = self.embedder.embed_texts([text_to_embed])[0]
-                            
+
                             embedding_data = {
                                 "paper_id": paper_id,
                                 "chunk_index": 0,
@@ -144,7 +153,7 @@ class IngestionService:
 
                         if since_last and consecutive_unchanged >= 50:
                             logger.info("Incremental threshold reached. Stopping.")
-                            start = max_results # break outer loop
+                            start = max_results  # break outer loop
                             break
 
                     except Exception as e:
@@ -162,6 +171,7 @@ class IngestionService:
             if run.status == "running":
                 run.status = "completed"
             import datetime
+
             run.finished_at = datetime.datetime.now(datetime.UTC)
             await self.run_repo.session.commit()
 

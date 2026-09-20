@@ -21,10 +21,7 @@ class AuthorRepository(BaseRepository[Author]):
 
         insert_stmt = insert(Author).values(
             [
-                {
-                    "display_name": a["display_name"],
-                    "normalized_name": a["normalized_name"]
-                }
+                {"display_name": a["display_name"], "normalized_name": a["normalized_name"]}
                 for a in authors_data
             ]
         )
@@ -33,9 +30,8 @@ class AuthorRepository(BaseRepository[Author]):
         # We'll update the display_name to the latest seen.
         update_stmt = insert_stmt.on_conflict_do_update(
             index_elements=["normalized_name"],
-            set_={"display_name": insert_stmt.excluded.display_name}
+            set_={"display_name": insert_stmt.excluded.display_name},
         ).returning(Author.normalized_name, Author.id)
 
         result = await self.session.execute(update_stmt)
         return {row.normalized_name: row.id for row in result.all()}
-

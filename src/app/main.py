@@ -1,30 +1,30 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 import structlog
 from asgi_correlation_id import CorrelationIdMiddleware
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
-
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi.errors import RateLimitExceeded
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api.errors import (
+    generic_exception_handler,
+    http_exception_handler,
+    rate_limit_handler,
+    validation_exception_handler,
+)
+from app.api.limiter import limiter
+from app.api.middleware import LoggingMiddleware
 from app.api.router import api_router, health_router
 from app.core.logging import setup_logging
 from app.core.settings import settings
-from app.api.limiter import limiter
-from app.api.errors import (
-    rate_limit_handler,
-    validation_exception_handler,
-    http_exception_handler,
-    generic_exception_handler,
-)
-from app.api.middleware import LoggingMiddleware
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Setup logging on startup
     setup_logging()
     logger = structlog.get_logger()
@@ -70,9 +70,10 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
     # Mount UI at root (Catch-all)
-    from fastapi.staticfiles import StaticFiles
     from pathlib import Path
-    
+
+    from fastapi.staticfiles import StaticFiles
+
     static_dir = Path(__file__).parent / "static"
     app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
 

@@ -2,9 +2,9 @@ import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
-from app.api.limiter import limiter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.limiter import limiter
 from app.api.schemas.stats import (
     AuthorsPerPaperStats,
     CorpusSummary,
