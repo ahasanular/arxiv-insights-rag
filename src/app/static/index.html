@@ -205,10 +205,29 @@
             font-style: italic;
             display: none;
         }
+        .citation-badge {
+            display: inline-block;
+            font-size: 0.75rem;
+            vertical-align: super;
+            color: #2563eb;
+            background-color: #eff6ff;
+            text-decoration: none;
+            padding: 2px 6px;
+            border-radius: 9999px;
+            margin: 0 2px;
+            font-weight: 600;
+            border: 1px solid #bfdbfe;
+            transition: all 0.2s;
+        }
+
+        .citation-badge:hover {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+        }
     </style>
 </head>
 
-<body>
+<body class="bg-slate-50 text-slate-800">
 
     <div class="sidebar">
         <h2>arXiv Insight</h2>
@@ -385,6 +404,9 @@
                 }
 
                 let answerHtml = data.answer.replace(/\n/g, '<br>');
+
+                // Parse inline citations e.g. [2305.14314] or [2305.14314v1]
+                answerHtml = answerHtml.replace(/\[([0-9]{4}\.[0-9]{4,5}(?:v[0-9]+)?)\]/g, '<a href="https://arxiv.org/abs/$1" target="_blank" class="citation-badge" title="ArXiv: $1">[$1]</a>');
 
                 // Add sources if available
                 if (data.sources && data.sources.length > 0) {

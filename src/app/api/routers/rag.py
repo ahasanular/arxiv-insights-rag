@@ -26,16 +26,23 @@ def get_rag_service(session: AsyncSession = Depends(get_db_session)) -> RagServi
 
 
 @router.post("/ask", response_model=AskResponse)
-@limiter.limit("10/minute")
+@limiter.limit("5/minute")
 async def ask_question(
     request: Request, ask_req: AskRequest, rag_svc: RagService = Depends(get_rag_service)
 ):
     """
     RAG endpoint to ask questions about the arXiv papers.
     """
-    if len(ask_req.question.strip()) < 5:
+    # 1. Sanitize Input
+    # Strip leading/trailing whitespace and collapse multiple spaces/newlines into a single space
+    sanitized_question = " ".join(ask_req.question.split())
+    
+    if len(sanitized_question) < 5:
         raise HTTPException(status_code=422, detail="Question too short")
-    if len(ask_req.question) > 500:
+    if len(sanitized_question) > 500:
         raise HTTPException(status_code=422, detail="Question too long")
 
+    # Update the request with the sanitized string before passing to service
+    ask_req.question = sanitized_question
+    
     return await rag_svc.ask(ask_req)
