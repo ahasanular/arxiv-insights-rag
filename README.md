@@ -24,12 +24,14 @@ docker compose up --build
 **3. Ingest Papers**
 Because the CLI is packaged into the API container, you can ingest papers directly without installing Python locally (run this multiple times to ingest 1000 records from multiple choosen categories):
 ```bash
-docker compose exec api agy-ingest ingest -c cat:cs.AI -m 200
+docker exec arxiv-insight-api-1 agy-ingest ingest -c cat:cs.AI -m 200
 ```
 or for better customized usage
 ```bash
-docker compose exec api agy-ingest ingest --help
+docker exec arxiv-insight-api-1 agy-ingest ingest --help
 ```
+
+> **Note:** Make sure to find and use the appropriate Docker container name for the backend service. Depending on your environment or root folder name, the container might be named differently (e.g., `arxiv-insight-api-1`). You can check the correct name by running `docker ps`.
 
 *Alternative: Local Installation (For Development)*
 ```bash
