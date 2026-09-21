@@ -40,7 +40,7 @@ class IngestionService:
     async def ingest_papers(
         self,
         search_query: str,
-        max_results: int = 100,
+        max_results: int = 1000,
         since_last: bool = False,
         resume_cursor: int | None = None,
         dry_run: bool = False,

@@ -2,7 +2,7 @@
 PYTHON = PYTHONPATH=src .venv/bin/python
 BIN = .venv/bin
 
-.PHONY: up down build logs ingest reindex wipe status eval test lint format check
+.PHONY: up down build logs ingest reindex wipe status eval test
 
 up:
 	docker compose up -d
@@ -35,10 +35,3 @@ eval:
 # Dev commands
 test:
 	PYTHONPATH=src $(BIN)/pytest
-
-lint:
-	PYTHONPATH=src $(BIN)/ruff check .
-
-format:
-	PYTHONPATH=src $(BIN)/ruff format .
-

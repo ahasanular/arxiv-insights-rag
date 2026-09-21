@@ -1,4 +1,4 @@
-# arXiv Insight
+# arXiv Insight RAG
 
 A complete pipeline and API for ingesting arXiv research papers, storing them relationally, and querying them using an Advanced Retrieval-Augmented Generation (RAG) system with strictly engineered guardrails.
 
@@ -22,9 +22,13 @@ docker compose up --build
 - **API Docs**: http://localhost:8000/docs
 
 **3. Ingest Papers**
-Because the CLI is packaged into the API container, you can ingest papers directly without installing Python locally:
+Because the CLI is packaged into the API container, you can ingest papers directly without installing Python locally (run this multiple times to ingest 1000 records from multiple choosen categories):
 ```bash
-docker compose exec api agy-ingest ingest -c cat:cs.AI -m 100
+docker compose exec api agy-ingest ingest -c cat:cs.AI -m 200
+```
+or for better customized usage
+```bash
+docker compose exec api agy-ingest ingest --help
 ```
 
 *Alternative: Local Installation (For Development)*
@@ -67,17 +71,38 @@ The conversational RAG pipeline is fortified with advanced prompt engineering to
 
 ## ⚡ Sample API Requests
 
-**1. Analytics Aggregation (Cached)**
+**1. Dashboard Visualization Data (Cached)**
 ```bash
-curl -X GET "http://localhost:8000/api/v1/stats/authors-per-paper"
+curl -X GET "http://localhost:8000/api/v1/stats/visualization"
 ```
 ```json
 {
-  "data": [
-    { "author_count": 1, "paper_count": 12 },
-    { "author_count": 2, "paper_count": 45 }
-  ],
-  "meta": { "cached": true, "timestamp": "2026-09-21T00:00:00Z" }
+  "data": {
+    "summary": {
+      "total_papers": 1250,
+      "total_authors": 3405,
+      "total_categories": 12,
+      "min_date": "2020-01-01T00:00:00Z",
+      "max_date": "2024-01-01T00:00:00Z",
+      "embedding_coverage_pct": 100.0,
+      "last_ingest": "2026-09-21T06:00:00Z"
+    },
+    "papers_over_time": [
+      { "period": "2023-01", "count": 150 },
+      { "period": "2023-02", "count": 180 }
+    ],
+    "top_categories": [
+      { "code": "cs.AI", "label": "Artificial Intelligence", "count": 450, "share_pct": 36.0 }
+    ],
+    "top_authors": [
+      { "display_name": "Yoshua Bengio", "normalized_name": "yoshua bengio", "count": 15 }
+    ]
+  },
+  "meta": {
+    "generated_at": "2026-09-21T06:00:00Z",
+    "total": null,
+    "filters": {}
+  }
 }
 ```
 
@@ -125,21 +150,24 @@ This project was built with a philosophy of maintaining simplicity and avoiding 
 ---
 
 ## ⚠️ Known Limitations
-1. **Author Over-merging:** Name variations like "J. Smith" and "John Smith" are currently treated as distinct authors without disambiguation.
-2. **Pagination Shifts:** arXiv's pagination can shift if new papers are published during a large, multi-hour crawl.
-3. **Single-Threaded Ingestion:** The `agy-ingest` CLI fetches and embeds papers sequentially on a single thread.
-4. **Single LLM Provider:** The system strictly uses Groq without dynamic fallback or model-switching capabilities (e.g., automatically trying OpenAI if Groq goes down).
-5. **RAG Context Constraints:** The RAG system only retrieves and reads abstracts, meaning it cannot answer highly specific methodological questions hidden deep inside the PDF bodies of the papers.
+1. **Abstract-Only Context Window:** The RAG system embeds and retrieves only paper abstracts (~150 words). It cannot answer deep methodological questions buried in the full PDF body (e.g., hyperparameter choices, proof details). This is an intentional trade-off to keep embedding costs near-zero and latency under 50ms.
+2. **Author Disambiguation:** Name variations like "J. Smith" and "John Smith" are treated as distinct authors. True disambiguation requires cross-referencing ORCID IDs or affiliation data, which arXiv's Atom API does not provide.
+3. **arXiv Pagination Drift:** During large multi-hour crawls, newly published papers can shift pagination windows, potentially causing duplicates or gaps. The system mitigates this with in-run `seen_arxiv_ids` deduplication, but cannot fully prevent it without a stable cursor API.
+4. **Sequential Ingestion:** The `agy-ingest` CLI fetches and embeds papers sequentially on a single thread to respect arXiv's strict 1-request-per-3-seconds rate limit. A 1,000-paper ingest takes ~50 minutes.
+5. **Single LLM Provider:** The system uses Groq exclusively. If Groq is rate-limited or down, the only fallback is the local extractive mode (no LLM call), which surfaces raw abstracts without synthesis.
+6. **Dense Vector Baseline Similarity:** The `bge-small-en-v1.5` model produces baseline cosine similarities of ~0.6–0.7 even for unrelated text. The relevance gate (`tau=0.75`) was empirically tuned to compensate, but edge cases near the threshold may still pass or be incorrectly filtered.
 
 ## 🔮 Future Improvements
-1. **Background Indexing:** Shift local `fastembed` computation and database inserts into a Celery background worker to free up the CLI during massive multi-thousand paper ingests.
-2. **Advanced Semantic Chunking:** Implement sliding-window chunking to ingest full PDF documents rather than just abstracts, providing deeper insights.
-3. **Multi-Agent RAG**: Upgrade the LLM pipeline to a multi-agent system where a "Researcher" agent gathers context and a "Writer" agent synthesizes it.
-4. **Multi-Model Routing:** Introduce LiteLLM or an internal routing layer to seamlessly switch between OpenAI, Groq, and Anthropic based on rate-limit exhaustion or specific query types.
+1. **Full-Text PDF Ingestion:** Implement sliding-window chunking with overlap to ingest entire paper PDFs (via `pymupdf` or `unstructured`), enabling the RAG system to answer deep technical questions beyond abstracts.
+2. **Background Indexing with Celery:** Offload `fastembed` computation and database writes to a Celery worker queue, freeing the CLI and enabling parallel ingestion of multiple categories.
+3. **Multi-Model Routing:** Introduce a routing layer (e.g., LiteLLM) to seamlessly switch between Groq, OpenAI, and Anthropic based on availability, rate-limit exhaustion, or query complexity — with automatic fallback chains.
+4. **Conversational Memory:** Add session-based conversation history so users can ask follow-up questions (e.g., "Tell me more about that last paper") without re-stating context.
+5. **Re-Ranking with Cross-Encoders:** Add a lightweight cross-encoder re-ranker (e.g., `cross-encoder/ms-marco-MiniLM-L-6-v2`) between retrieval and generation to dramatically improve precision on ambiguous queries.
+6. **Automated CI/CD Pipeline:** Add GitHub Actions for automated testing (via Testcontainers), Docker image builds, and deployment to a cloud provider on every push to `main`.
 
 ---
 
 <div align="center">
   <b>Developed by Arafath</b><br>
-  <a href="https:/ahasanularafath.com">Visit my website</a>
+  <a href="https://ahasanularafath.com">Visit my website</a>
 </div>
