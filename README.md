@@ -1,37 +1,42 @@
 # arXiv Insight RAG
 
-A complete pipeline and API for ingesting arXiv research papers, storing them relationally, and querying them using an Advanced Retrieval-Augmented Generation (RAG) system with strictly engineered guardrails.
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688.svg?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-336791.svg?style=flat-square&logo=postgresql)](https://github.com/pgvector/pgvector)
+[![Groq](https://img.shields.io/badge/LLM-Groq-f55036.svg?style=flat-square)](https://groq.com)
+[![Docker](https://img.shields.io/badge/Docker-compose-2496ED.svg?style=flat-square&logo=docker)](https://docker.com)
+[![Python](https://img.shields.io/badge/Python-3.13-3776AB.svg?style=flat-square&logo=python)](https://python.org)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+
+An end-to-end data pipeline and REST API for ingesting arXiv research papers, storing them in PostgreSQL with pgvector, and querying them using a hybrid Retrieval-Augmented Generation (RAG) system with strict anti-hallucination guardrails.
 
 ---
 
 ## 🚀 Setup & Run
 
-**1. Configure Environment**
-Copy the example environment file and add your Groq API key:
+### 1. Configure Environment
+Copy the example environment file and configure your Groq API key:
 ```bash
 cp .env.example .env
-# Edit .env to add your Groq API Key
+# Edit .env to add your Groq API Key (or leave empty for local extractive fallback)
 ```
 
-**2. Start Services (via Docker)**
-The easiest way to run the entire stack (Database, Redis, API, and Migrations) is via Docker Compose:
+### 2. Start Services (Docker)
+The easiest way to run the entire stack (PostgreSQL + pgvector, Redis, API, and Alembic migrations) is via Docker Compose:
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
-- **Dashboard UI**: http://localhost:8000/
-- **API Docs**: http://localhost:8000/docs
+- **Dashboard UI**: [http://localhost:8000/](http://localhost:8000/)
+- **API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-**3. Ingest Papers**
-Because the CLI is packaged into the API container, you can ingest papers directly without installing Python locally (run this multiple times to ingest 1000 records from multiple choosen categories):
+### 3. Ingest Papers
+The CLI tool is packaged directly into the container. Ingest papers from any arXiv category:
 ```bash
-docker exec arxiv-insight-api-1 agy-ingest ingest -c cat:cs.AI -m 200
-```
-or for better customized usage
-```bash
-docker exec arxiv-insight-api-1 agy-ingest ingest --help
-```
+# Ingest papers from a category (e.g., cs.AI, cs.LG, stat.ML)
+docker compose exec api agy-ingest ingest -c cat:cs.AI -m 100
 
-> **Note:** Make sure to find and use the appropriate Docker container name for the backend service. Depending on your environment or root folder name, the container might be named differently (e.g., `arxiv-insight-api-1`). You can check the correct name by running `docker ps`.
+# View all CLI options
+docker compose exec api agy-ingest ingest --help
+```
 
 *Alternative: Local Installation (For Development)*
 ```bash
@@ -45,35 +50,35 @@ agy-ingest ingest -c cat:cs.AI -m 100
 
 ## 🤖 Advanced RAG & LLM Engine
 
-We utilize **Groq** as our exclusive LLM provider to power lightning-fast inference using high-tier models like `llama3-70b-8192`. 
+Powered by **Groq** for high-throughput inference (e.g. `llama-3.3-70b-versatile` or `llama3-70b-8192`), fortified with structured retrieval and defense guardrails:
 
-The conversational RAG pipeline is fortified with advanced prompt engineering to ensure maximum accuracy and security:
-- **Chain-of-Thought (CoT) Verification**: The LLM is forced to output a `reasoning` field first, internally verifying if the retrieved documents definitively answer the question before committing to an answer.
-- **Strict Anti-Hallucination Guardrails**: The system rejects tangentially related documents and explicitly refuses to guess or infer information outside the provided text.
-- **Jailbreak Prevention**: User queries are strictly quarantined in XML tags to prevent prompt injection attacks.
-- **Inline Citations**: The LLM synthesizes cohesive narratives while meticulously citing its sources inline (e.g., `[1234.5678]`), which the frontend elegantly renders as clickable badges.
-- **Extractive Fallback**: If no API key is provided, the system gracefully falls back to a local extractive mode, surfacing the most relevant abstracts directly.
+- **Hybrid Search (RRF)**: Merges dense semantic embeddings (`fastembed` ONNX `bge-small-en-v1.5`) with PostgreSQL Full-Text Search (`tsvector`) using Reciprocal Rank Fusion.
+- **Chain-of-Thought (CoT) Verification**: The LLM outputs an internal `reasoning` trace first, verifying whether retrieved documents answer the question before committing to a response.
+- **Strict Anti-Hallucination Guardrails**: Filters out low-relevance contexts and explicitly abstains if the query falls outside the indexed corpus ($\tau=0.75$).
+- **Prompt Injection Defense**: User queries are quarantined within XML boundaries to neutralize injection attempts.
+- **Inline Citations**: Synthesizes responses with verifiable inline citations (e.g., `[2305.18290]`), rendered as clickable badges on the dashboard.
+- **Offline Fallback**: Automatically falls back to a local extractive search mode if no LLM API key is present.
 
 ---
 
-## 🏗️ Architecture & Schema
+## 🏗️ Architecture & Stack
 
-**Architecture:**
-- **Ingestion (`agy-ingest`)**: CLI tool that fetches papers from arXiv, sanitizes abstracts (`abstract` vs `abstract_raw`), and computes vector embeddings locally using `fastembed`.
-- **API (`app.main`)**: FastAPI backend exposing endpoints for the RAG engine and unified analytics.
-- **Database (`PostgreSQL + pgvector`)**: Handles relational joins and vector similarity search (hybrid search) natively.
-- **Caching & Rate Limiting (`Redis`)**: Redis backs our `SlowAPI` tiered rate limiter (`5/minute`, `50/day` for LLM endpoints) and aggressively caches heavy statistical queries to ensure lightning-fast dashboard loads.
+- **Ingestion CLI (`agy-ingest`)**: Fetches arXiv metadata via Atom API, sanitizes abstracts, and generates 384-dimensional embeddings locally on CPU via ONNX Runtime.
+- **Database (`PostgreSQL + pgvector`)**: Normalizes papers, authors, and categories with HNSW vector indexing and GIN full-text search indexes.
+- **Backend API (`FastAPI`)**: Asynchronous endpoints for RAG queries, analytics, and Prometheus health metrics.
+- **Caching & Rate Limiting (`Redis`)**: Powers `SlowAPI` rate limiting and aggressively caches heavy statistical queries for instant dashboard loads.
 
-**Schema (Core Tables):**
-- `papers`: Core metadata (ID, title, abstract).
-- `authors` & `categories`: Unique records linked via join tables (`paper_authors`, `paper_categories`).
-- `paper_embeddings`: 384-dimensional vector embeddings for semantic search.
+For deeper technical documentation, see:
+- 📖 [System Architecture & Developer Guide](docs/DEVELOPMENT.md)
+- 📊 [Database Schema & ER Diagram](docs/SCHEMA.md)
+- 🎯 [RAG Evaluation Harness & Metrics](docs/EVALUATION.md)
+- 🏛️ [Architectural Decision Records (ADRs)](docs/adr/)
 
 ---
 
 ## ⚡ Sample API Requests
 
-**1. Dashboard Visualization Data (Cached)**
+### 1. Dashboard Visualization Data (Cached)
 ```bash
 curl -X GET "http://localhost:8000/api/v1/stats/visualization"
 ```
@@ -108,7 +113,7 @@ curl -X GET "http://localhost:8000/api/v1/stats/visualization"
 }
 ```
 
-**2. RAG Search**
+### 2. RAG Query
 ```bash
 curl -X POST "http://localhost:8000/api/v1/ask" \
      -H "Content-Type: application/json" \
@@ -141,35 +146,33 @@ curl -X POST "http://localhost:8000/api/v1/ask" \
 
 ---
 
-## 🏛️ Decisions & Trade-offs
+## ⚖️ Trade-offs & Considerations
 
-This project was built with a philosophy of maintaining simplicity and avoiding premature optimization. Below are our key Architectural Decision Records (ADRs):
-
-- [ADR 1: Why pgvector over Chroma](docs/adr/0001-pgvector-over-chroma.md)
-- [ADR 2: Why no semantic chunking for abstracts](docs/adr/0002-no-semantic-chunking.md)
-- [ADR 3: Why fastembed is the default embedder](docs/adr/0003-fastembed-default.md)
+1. **Abstract-Level Indexing:** The system indexes paper abstracts (~150 words) rather than full PDFs. This keeps embedding costs minimal and retrieval latency under 50ms, while remaining highly effective for paper discovery and synthesis.
+2. **Author Disambiguation:** Author names are normalized, but distinct authors with identical names are aggregated. True disambiguation requires cross-referencing external identifiers (e.g., ORCID).
+3. **API Rate Compliance:** Ingestion crawls are paced at ~3.1 seconds per request to adhere to arXiv's fair usage policies.
+4. **Dense Vector Baseline Similarity:** Dense models (`bge-small-en-v1.5`) exhibit non-zero baseline similarities for unrelated texts; an empirical relevance gate ($\tau=0.75$) prevents irrelevant retrieval.
 
 ---
 
-## ⚠️ Known Limitations
-1. **Abstract-Only Context Window:** The RAG system embeds and retrieves only paper abstracts (~150 words). It cannot answer deep methodological questions buried in the full PDF body (e.g., hyperparameter choices, proof details). This is an intentional trade-off to keep embedding costs near-zero and latency under 50ms.
-2. **Author Disambiguation:** Name variations like "J. Smith" and "John Smith" are treated as distinct authors. True disambiguation requires cross-referencing ORCID IDs or affiliation data, which arXiv's Atom API does not provide.
-3. **arXiv Pagination Drift:** During large multi-hour crawls, newly published papers can shift pagination windows, potentially causing duplicates or gaps. The system mitigates this with in-run `seen_arxiv_ids` deduplication, but cannot fully prevent it without a stable cursor API.
-4. **Sequential Ingestion:** The `agy-ingest` CLI fetches and embeds papers sequentially on a single thread to respect arXiv's strict 1-request-per-3-seconds rate limit. A 1,000-paper ingest takes ~50 minutes.
-5. **Single LLM Provider:** The system uses Groq exclusively. If Groq is rate-limited or down, the only fallback is the local extractive mode (no LLM call), which surfaces raw abstracts without synthesis.
-6. **Dense Vector Baseline Similarity:** The `bge-small-en-v1.5` model produces baseline cosine similarities of ~0.6–0.7 even for unrelated text. The relevance gate (`tau=0.75`) was empirically tuned to compensate, but edge cases near the threshold may still pass or be incorrectly filtered.
+## 🔮 Roadmap
 
-## 🔮 Future Improvements
-1. **Full-Text PDF Ingestion:** Implement sliding-window chunking with overlap to ingest entire paper PDFs (via `pymupdf` or `unstructured`), enabling the RAG system to answer deep technical questions beyond abstracts.
-2. **Background Indexing with Celery:** Offload `fastembed` computation and database writes to a Celery worker queue, freeing the CLI and enabling parallel ingestion of multiple categories.
-3. **Multi-Model Routing:** Introduce a routing layer (e.g., LiteLLM) to seamlessly switch between Groq, OpenAI, and Anthropic based on availability, rate-limit exhaustion, or query complexity — with automatic fallback chains.
-4. **Conversational Memory:** Add session-based conversation history so users can ask follow-up questions (e.g., "Tell me more about that last paper") without re-stating context.
-5. **Re-Ranking with Cross-Encoders:** Add a lightweight cross-encoder re-ranker (e.g., `cross-encoder/ms-marco-MiniLM-L-6-v2`) between retrieval and generation to dramatically improve precision on ambiguous queries.
-6. **Automated CI/CD Pipeline:** Add GitHub Actions for automated testing (via Testcontainers), Docker image builds, and deployment to a cloud provider on every push to `main`.
+- [ ] **Full-Text PDF Ingestion**: Sliding-window chunking to index full paper PDFs for deeper technical queries.
+- [ ] **Asynchronous Workers**: Offload batch crawling and embeddings to Celery/Redis workers.
+- [ ] **Multi-Model Support**: Dynamic routing between Groq, OpenAI, Anthropic, and local Ollama models.
+- [ ] **Cross-Encoder Re-Ranking**: Optional secondary re-ranker (`ms-marco-MiniLM-L-6-v2`) for complex search queries.
+- [ ] **Conversational Memory**: Multi-turn conversation sessions for contextual follow-up questions.
+
+---
+
+## 📄 License
+
+Distributed under the [MIT License](LICENSE).
 
 ---
 
 <div align="center">
   <b>Developed by Arafath</b><br>
-  <a href="https://ahasanularafath.com">Visit my website</a>
+  <a href="https://ahasanularafath.com">ahasanularafath.com</a>
 </div>
+
